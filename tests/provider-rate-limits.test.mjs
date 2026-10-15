@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { consumeProviderRateLimit } from "../lib/provider-rate-limits.mjs";
-import { listMarketProviders } from "../lib/market-providers.mjs";
+import { fetchAttributedMarketData, listMarketProviders } from "../lib/market-providers.mjs";
 
 const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "server-test-key" };
 
@@ -32,8 +32,12 @@ test("shared rate limiter reports retry time without fetching a provider", async
   }), (e) => e.code === "RATE_LIMITED" && e.retryAfterMs === 2345);
 });
 
-test("market registry attributes only explicitly configured providers", () => {
+test("market registry attributes configured providers and rejects unknown sources", async () => {
   const items = listMarketProviders();
   assert.deepEqual(items.map(x => x.id), ["coingecko", "dexscreener"]);
   assert.equal(items.some(x => x.id === "unknown"), false);
+  await assert.rejects(
+    fetchAttributedMarketData({ provider: "unknown", path: "/search" }),
+    (error) => error instanceof TypeError && error.message === "Unsupported market provider"
+  );
 });
