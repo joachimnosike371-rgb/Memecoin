@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { appendAuditEvent } from "@/lib/audit-store.mjs";
+import { appendAuditEvent } from "@/lib/audit-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
