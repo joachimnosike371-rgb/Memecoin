@@ -29,9 +29,10 @@ test("venue remains unverified until a fee hook or contract is verified", () => 
 test("market provider attributes source and enforces per-provider rate limits", async () => {
   resetMarketRateLimitsForTests();
   const fetcher = async () => ({ ok: true, json: async () => ({ price: 12 }) });
-  const result = await fetchMarketSnapshot({ provider: "demo", url: "https://example.test/market", fetcher, limit: 1, now: 1000 });
+  const result = await fetchMarketSnapshot({ provider: "demo", url: "https://example.test/market?api_key=do-not-store", fetcher, limit: 1, now: 1000 });
   assert.equal(result.provider, "demo");
   assert.equal(result.sourceUrl, "https://example.test/market");
+  assert.doesNotMatch(result.sourceUrl, /api_key|do-not-store/);
   assert.deepEqual(result.data, { price: 12 });
   await assert.rejects(
     fetchMarketSnapshot({ provider: "demo", url: "https://example.test/market", fetcher, limit: 1, now: 1001 }),
