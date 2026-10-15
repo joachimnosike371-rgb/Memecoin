@@ -6,7 +6,7 @@ export interface AuditEventInput {
   entityId?: string | null;
   metadata?: Record<string, unknown>;
 }
-export interface PersistedAuditResult {
+export interface AuditEventWriteResult {
   event: Readonly<{
     id: string;
     type: string;
@@ -27,5 +27,5 @@ export function appendAuditEvent(
     env?: Record<string, string | undefined>;
     fetcher?: typeof fetch;
   }
-): Promise<PersistedAuditResult>;
+): Promise<AuditEventWriteResult>;
 export function isAuditStorageConfigured(env?: Record<string, string | undefined>): boolean;
