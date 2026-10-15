@@ -35,5 +35,5 @@ test("shared rate limiter reports retry time without fetching a provider", async
 test("market registry attributes only explicitly configured providers", () => {
   const items = listMarketProviders();
   assert.deepEqual(items.map(x => x.id), ["coingecko", "dexscreener"]);
-  assert.throws(() => listMarketProviders().find(x => x.id === "unknown"), () => true);
+  assert.deepEqual(items.map(x => x.id).filter(id => id === "unknown"), []);
 });
