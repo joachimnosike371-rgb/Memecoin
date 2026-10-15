@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Chain = "All chains" | "Ethereum" | "BNB Chain" | "Solana";
 type Activity = { time: string; title: string; detail: string; status: "Ready" | "Simulation" | "Needs setup" };
@@ -28,6 +28,18 @@ export default function Home() {
   const [tokenName, setTokenName] = useState("");
   const [ticker, setTicker] = useState("");
   const [notice, setNotice] = useState("Simulation mode is active. No wallet is connected and no transactions can be sent.");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("zero-capital-farm:draft");
+      if (!saved) return;
+      const draft = JSON.parse(saved) as { tokenName?: string; ticker?: string; narrative?: string };
+      setTokenName(draft.tokenName ?? "");
+      setTicker(draft.ticker ?? "");
+      setNarrative(draft.narrative ?? "");
+    } catch {
+      localStorage.removeItem("zero-capital-farm:draft");
+    }
+  }, []);
   const filteredChains = useMemo(() => chain === "All chains" ? chains : chains.filter((item) => item.name === chain), [chain]);
 
   function createDraft() {
@@ -35,7 +47,19 @@ export default function Home() {
       setNotice("Enter a token name and ticker to create a local launch draft.");
       return;
     }
-    setNotice(`Draft saved locally: ${tokenName.trim()} (${ticker.trim().toUpperCase()}). This does not deploy a token.`);
+    const draft = {
+      tokenName: tokenName.trim(),
+      ticker: ticker.trim().toUpperCase(),
+      narrative: narrative.trim(),
+      chain,
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      localStorage.setItem("zero-capital-farm:draft", JSON.stringify(draft));
+      setNotice(`Draft saved on this device: ${draft.tokenName} (${draft.ticker}). This does not deploy a token.`);
+    } catch {
+      setNotice("Could not save locally. Check this browser's storage settings.");
+    }
   }
 
   return (
@@ -71,7 +95,16 @@ export default function Home() {
         <section className="work-grid">
           <article className="panel launch-panel" id="launch"><div className="panel-head"><div><p className="eyebrow">TOKEN WORKFLOW</p><h3>Launch preparation</h3></div><span className="step-count">STEP 01 / 03</span></div><p className="panel-description">Create a draft to organize a token concept. This does not deploy a contract or spend funds.</p><label htmlFor="tokenName">Token name</label><input id="tokenName" value={tokenName} onChange={(event) => setTokenName(event.target.value)} placeholder="e.g. Signal Protocol" maxLength={40} /><label htmlFor="ticker">Ticker</label><input id="ticker" value={ticker} onChange={(event) => setTicker(event.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10))} placeholder="e.g. SIGNAL" maxLength={10} /><label htmlFor="narrative">Market narrative / thesis</label><textarea id="narrative" value={narrative} onChange={(event) => setNarrative(event.target.value)} placeholder="What signal makes this concept relevant?" rows={3} maxLength={1000} /><div className="fee-note"><span>Target fee model</span><strong>1% buy / 1% sell</strong><small>Only enforceable when supported by the actual token/market contracts.</small></div><button className="primary-button full" onClick={createDraft}>Save launch draft <span>→</span></button><p className="notice" role="status">{notice}</p></article>
 
-          <article className="panel activity-panel" id="activity"><div className="panel-head"><div><p className="eyebrow">SYSTEM JOURNAL</p><h3>Latest activity</h3></div><span className="live-label"><i /> LOCAL</span></div><div className="activity-list">{activity.map((item) => <div className="activity-row" key={item.title}><div className="activity-marker">·</div><div className="activity-copy"><span className="activity-time">{item.time}</span><h4>{item.title}</h4><p>{item.detail}</p></div><span className={"activity-status " + item.status.toLowerCase().replace(" ", "-")}>{item.status}</span></div>)}</div><div className="audit-footer"><span>Audit events shown: 3</span><button onClick={() => setNotice("Audit export is not wired up yet; no fabricated transaction data will be exported.")}>Export log ↗</button></div></article>
+          <article className="panel activity-panel" id="activity"><div className="panel-head"><div><p className="eyebrow">SYSTEM JOURNAL</p><h3>Latest activity</h3></div><span className="live-label"><i /> LOCAL</span></div><div className="activity-list">{activity.map((item) => <div className="activity-row" key={item.title}><div className="activity-marker">·</div><div className="activity-copy"><span className="activity-time">{item.time}</span><h4>{item.title}</h4><p>{item.detail}</p></div><span className={"activity-status " + item.status.toLowerCase().replace(" ", "-")}>{item.status}</span></div>)}</div><div className="audit-footer"><span>Audit events shown: 3</span><button onClick={() => {
+              const csv = ["time,title,detail,status", ...activity.map((item) => [item.time, item.title, item.detail, item.status].map((value) => `"${value.replace(/"/g, '""')}"`).join(","))].join("\\n");
+              const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "zero-capital-farm-audit.csv";
+              link.click();
+              URL.revokeObjectURL(url);
+              setNotice("Audit log exported. Entries are system status records, not on-chain transactions.");
+            }}>Export log ↗</button></div></article>
         </section>
         <footer><span>ZERO CAPITAL FARM <b>·</b> FOUNDATION BUILD</span><span>NO WALLET CONNECTED <b>·</b> NO LIVE EXECUTION</span></footer>
       </section>
