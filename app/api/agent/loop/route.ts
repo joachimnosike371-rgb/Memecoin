@@ -12,7 +12,7 @@ export const maxDuration = 30;
 export async function GET(request: Request) {
   const expected = process.env.CRON_SECRET;
   const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
-    || new URL(request.url).searchParams.get("secret");
+    || "";
   if (!expected || !supplied || supplied.length !== expected.length) {
     return NextResponse.json({ ok: false, error: "Unauthorized scheduler request." }, { status: 401 });
   }
