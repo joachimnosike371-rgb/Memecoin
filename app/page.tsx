@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 type Chain = "All chains" | "Ethereum" | "BNB Chain" | "Solana";
 type Activity = { time: string; title: string; detail: string; status: "Ready" | "Simulation" | "Needs setup" };
+type Narrative = { topic: string; score: number; mentions: number; engagement: number; examples: string[] };
+type TokenConcept = { name: string; ticker: string; thesis: string; risks: string; confidence: number };
 
 const activity: Activity[] = [
   { time: "SYSTEM", title: "Trading execution disabled", detail: "Mainnet actions require explicit release approval.", status: "Needs setup" },
@@ -28,6 +30,11 @@ export default function Home() {
   const [tokenName, setTokenName] = useState("");
   const [ticker, setTicker] = useState("");
   const [notice, setNotice] = useState("Simulation mode is active. No wallet is connected and no transactions can be sent.");
+  const [narratives, setNarratives] = useState<Narrative[]>([]);
+  const [concepts, setConcepts] = useState<TokenConcept[]>([]);
+  const [selectedNarrative, setSelectedNarrative] = useState<Narrative | null>(null);
+  const [discovering, setDiscovering] = useState(false);
+  const [generating, setGenerating] = useState(false);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("zero-capital-farm:draft");
@@ -41,6 +48,57 @@ export default function Home() {
     }
   }, []);
   const filteredChains = useMemo(() => chain === "All chains" ? chains : chains.filter((item) => item.name === chain), [chain]);
+
+  async function discoverNarratives() {
+    setDiscovering(true);
+    setNotice("Searching X for recent narratives…");
+    try {
+      const response = await fetch("/api/narratives", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "Narrative discovery failed.");
+      setNarratives(result.narratives ?? []);
+      setSelectedNarrative(result.narratives?.[0] ?? null);
+      setConcepts([]);
+      setNotice(`Ranked ${result.narratives?.length ?? 0} topics from ${result.tweetCount ?? 0} recent X posts.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Narrative discovery failed.");
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
+  async function generateConcepts(item: Narrative | null = selectedNarrative) {
+    if (!item) {
+      setNotice("Find X narratives first, then select a topic.");
+      return;
+    }
+    setSelectedNarrative(item);
+    setGenerating(true);
+    setNotice("Asking Grok to generate concept drafts…");
+    try {
+      const response = await fetch("/api/concepts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ narrative: item.topic, examples: item.examples })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "Grok concept generation failed.");
+      setConcepts(result.concepts ?? []);
+      setNotice(`Grok generated ${result.concepts?.length ?? 0} concept drafts. Nothing has been deployed or traded.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Grok concept generation failed.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function useConcept(item: TokenConcept) {
+    setTokenName(item.name);
+    setTicker(item.ticker);
+    setNarrative(`${item.thesis} Risks: ${item.risks}`);
+    setNotice(`Loaded ${item.name} (${item.ticker}) into launch preparation. Save the draft to keep it on this device.`);
+    document.getElementById("launch")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function createDraft() {
     if (!tokenName.trim() || !ticker.trim()) {
@@ -87,6 +145,22 @@ export default function Home() {
           <Metric label="ACTIVE LAUNCHES" value="0" caption="No contracts deployed" />
           <Metric label="WATCHLIST SIGNALS" value="0" caption="Provider not connected" />
           <Metric label="AGENT STATUS" value="STANDBY" caption="Execution disabled" />
+        </section>
+
+        <section className="panel" id="narratives" style={{ marginBottom: 24 }}>
+          <div className="panel-head"><div><p className="eyebrow">SIGNAL DISCOVERY</p><h3>Trending X narratives</h3></div><button className="primary-button" onClick={discoverNarratives} disabled={discovering}>{discovering ? "Searching…" : "Find trending narratives ↗"}</button></div>
+          <p className="panel-description">Ranks recent X posts by topic frequency, engagement, and recency. Requires a server-side X API bearer token.</p>
+          {narratives.length > 0 ? <div className="activity-list">{narratives.slice(0, 8).map((item) => <div className="activity-row" key={item.topic}>
+            <div className="activity-marker">#</div><div className="activity-copy"><h4>{item.topic}</h4><p>Score {item.score} · {item.mentions} mentions · {Math.round(item.engagement)} engagement points</p></div>
+            <button className="text-button" onClick={() => { setSelectedNarrative(item); setNarrative(item.topic); }} aria-pressed={selectedNarrative?.topic === item.topic}>{selectedNarrative?.topic === item.topic ? "Selected" : "Select"}</button>
+          </div>)}</div> : <p className="notice">No live topics loaded yet. Discovery uses live X data when credentials and API access are configured.</p>}
+          <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <span className="muted">{selectedNarrative ? `Selected: ${selectedNarrative.topic}` : "Select a ranked topic to generate concepts."}</span>
+            <button className="primary-button" onClick={() => generateConcepts()} disabled={generating || !selectedNarrative}>{generating ? "Generating…" : "Generate concepts with Grok ↗"}</button>
+          </div>
+          {concepts.length > 0 && <div className="chain-grid" style={{ marginTop: 18 }}>{concepts.map((item, index) => <article className="chain-card" key={item.ticker + index} style={{ alignItems: "flex-start" }}>
+            <div className="chain-icon">{item.ticker.slice(0, 4)}</div><div className="chain-info"><h4>{item.name} ({item.ticker})</h4><p>{item.thesis}</p><p><strong>Risks:</strong> {item.risks}</p><p>Grok confidence: {item.confidence}/100 · concept only</p><button className="text-button" onClick={() => useConcept(item)}>Use in launch draft →</button></div>
+          </article>)}</div>}
         </section>
 
         <div className="section-heading"><div><p className="eyebrow">NETWORK LAYER</p><h3>Chain connections</h3></div><select aria-label="Filter chains" value={chain} onChange={(event) => setChain(event.target.value as Chain)}><option>All chains</option><option>Ethereum</option><option>BNB Chain</option><option>Solana</option></select></div>
